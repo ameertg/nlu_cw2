@@ -317,6 +317,11 @@ class LSTMDecoder(Seq2SeqDecoder):
                 attn_weights[:, j, :] = step_attn_weights
 
                 if self.use_lexical_model:
+                    #Step attention weights of dimension (Batch size, Src time steps) -> (src time steps, batch size, 1)
+                    #Src embedding of dimension (Src time steps, batch size, embedding dim)
+
+                    #Weighted average = sum(attention_at_time(t) * word_at_time(t))
+                    #so weighted average has dim (batchsize, embedding dimension)
                     weighted_average = torch.sum(step_attn_weights.transpose(0, 1).unsqueeze(2) * src_embeddings, axis=0)
                     lexical_contexts.append(weighted_average)
 
@@ -338,6 +343,8 @@ class LSTMDecoder(Seq2SeqDecoder):
         decoder_output = self.final_projection(decoder_output)
 
         if self.use_lexical_model:
+            #List of tensors of dimension (batchsize, embedding) with output_length elements
+            #Stacking gives a tensor with (output_length elements, batchsize, embedding) -> (batchsize, output_length, embedding)
             lexical_contexts = torch.stack(lexical_contexts).transpose(0, 1)
             proj_contexts = torch.tanh(self.lexical_projection_1(lexical_contexts)) + lexical_contexts
             proj_contexts = self.lexical_projection_2(proj_contexts)

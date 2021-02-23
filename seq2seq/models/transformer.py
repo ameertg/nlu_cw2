@@ -96,7 +96,12 @@ class TransformerEncoder(Seq2SeqEncoder):
         '''
         ___QUESTION-6-DESCRIBE-A-START___
         What is the purpose of the positional embeddings in the encoder and decoder? Why can't we use only
-        the embeddings similar to for the LSTM? 
+        the embeddings similar to for the LSTM?
+        '''
+        '''
+        The multi-head attention layer has no mechanism with which to capture the relationships between words
+        given their position in the sentence. For example in the sentence 'Sarah gave Jane the keys' the relationship
+        between Sarah and Jane as subject and object is deduced mainly from the fact that Sarah precedes the verb.
         '''
         embeddings += self.embed_positions(src_tokens)
         '''
@@ -188,6 +193,16 @@ class TransformerDecoder(Seq2SeqDecoder):
             What is the purpose of self_attn_mask? Why do we need it in the decoder but not in the encoder?
             Why do we not need a mask for incremental decoding?
             '''
+            '''
+            From Vaswani et al: We also modify the self-attention
+            sub-layer in the decoder stack to prevent positions from attending to subsequent positions. This
+            masking, combined with fact that the output embeddings are offset by one position, ensures that the
+            predictions for position i can depend only on the known outputs at positions less than i.
+
+            What this means is that when the model is decoding the output the model should only consider the input
+            sequence and what has already been translated. Otherwise, the model would attend to the future of the translation
+            but that provides no information.
+            '''
             self_attn_mask = self.buffered_future_mask(forward_state) if incremental_state is None else None
             '''
             ___QUESTION-6-DESCRIBE-B-END___
@@ -215,6 +230,12 @@ class TransformerDecoder(Seq2SeqDecoder):
             ___QUESTION-6-DESCRIBE-C-START___
             Why do we need a linear projection after the decoder layers? What is the dimensionality of forward_state
             after this line? What would the output represent if features_only=True?
+            '''
+            '''
+            The features may not necessarily be of the right dimension. The linear projection projects each tensor in the decoded sequence
+            into the embedding space of the output tokens. If features_only=True each tensor in the output represents the features that
+            determine the word in the output sequence. For example on a high level these could define the POS which the output word should
+            satisfy or even semantic properties.
             '''
             forward_state = self.embed_out(forward_state)
             '''
