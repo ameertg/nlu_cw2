@@ -214,6 +214,8 @@ class MultiHeadAttention(nn.Module):
 
         d_k = self.head_embed_size
 
+        # input shape (target length, batch size, embed dim) -> output (target length, batch size, head_embed dim * num_heads)
+
         # Get projections of shape (Target length, batch size * num heads, head embed dim)
         Q =   self.q_proj(query).view(query.size(0), query.size(1) * self.num_heads, d_k)
         K =   self.k_proj(key).view(key.size(0), key.size(1) * self.num_heads, d_k)
@@ -224,35 +226,36 @@ class MultiHeadAttention(nn.Module):
         K = K.transpose(0, 1)
         V = V.transpose(0, 1)
 
+        # (target_length, head embed dim) * (head embed dim, target length) = (target length, target length)
+
         dotted_attention = torch.matmul(Q, K.transpose(1, 2)) / math.sqrt(d_k)
+
+
+        # dotted attention shape (batch * num heads, target_length, target_length)
 
         # Masking code mostly adapted from pytorch github repo
         if attn_mask is not None:
             # Apply boolean mask if torch.bool
             if attn_mask.dtype == torch.bool:
-                dotted_attention.masked_fill_(attn_mask.unsqueeze(0), 0)
+                dotted_attention.masked_fill_(attn_mask.unsqueeze(0), float('-inf'))
             else:
-                # Otherwise simply add the mask
-                dotted_attention = dotted_attention.masked_fill_(attn_mask.unsqueeze(0) < 0, 0)
-
+                dotted_attention = dotted_attention + attn_mask
+                
         if key_padding_mask is not None:
             # Reshape attention weights to [num_heads, batch_size, tgt_length, tgt_length]
-            dotted_attention = dotted_attention.reshape(self.num_heads,
-                query.size(1),
+            dotted_attention = dotted_attention.reshape(query.size(1),
+                self.num_heads,
                 dotted_attention.size(1),
                 dotted_attention.size(2))
-
             # Unsqueeze and repeat padding mask to match
-            key_padding_mask = key_padding_mask.unsqueeze(0).unsqueeze(3).repeat(1, 1, 1, dotted_attention.size(3))
             dotted_attention = dotted_attention.masked_fill(
-                key_padding_mask,
-                0,
-                )
+                key_padding_mask.unsqueeze(1).unsqueeze(2),
+                float('-inf'),
+            )
             # Reshape attention back to normal
             dotted_attention = dotted_attention.view(self.num_heads * query.size(1), dotted_attention.size(2), dotted_attention.size(3))
 
-
-        attn_weights = F.softmax(dotted_attention, dim=-1)
+        attn_weights = F.softmax(dotted_attention, dim=2)
         attn = torch.matmul(attn_weights, V).view(query.size(0), query.size(1), self.embed_dim)
 
         attn = self.out_proj(attn)
