@@ -226,8 +226,7 @@ class MultiHeadAttention(nn.Module):
         K = K.transpose(0, 1)
         V = V.transpose(0, 1)
 
-        # (target_length, head embed dim) * (head embed dim, target length) = (target length, target length)
-
+        # Compute scaled dotted attention
         dotted_attention = torch.matmul(Q, K.transpose(1, 2)) / math.sqrt(d_k)
 
 
@@ -240,7 +239,8 @@ class MultiHeadAttention(nn.Module):
                 dotted_attention.masked_fill_(attn_mask.unsqueeze(0), float('-inf'))
             else:
                 dotted_attention = dotted_attention + attn_mask
-                
+
+
         if key_padding_mask is not None:
             # Reshape attention weights to [num_heads, batch_size, tgt_length, tgt_length]
             dotted_attention = dotted_attention.reshape(query.size(1),
@@ -254,7 +254,7 @@ class MultiHeadAttention(nn.Module):
             )
             # Reshape attention back to normal
             dotted_attention = dotted_attention.view(self.num_heads * query.size(1), dotted_attention.size(2), dotted_attention.size(3))
-
+            
         attn_weights = F.softmax(dotted_attention, dim=2)
         attn = torch.matmul(attn_weights, V).view(query.size(0), query.size(1), self.embed_dim)
 
