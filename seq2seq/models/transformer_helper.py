@@ -33,6 +33,9 @@ class TransformerEncoderLayer(nn.Module):
         What is the purpose of encoder_padding_mask? What will the output shape of `state' Tensor
         be after multi-head attention? HINT: formulate your  answer in terms of
         constituent variables like batch_size, embed_dim etc...
+
+        Input sequences can have different lengths, so in order for the self-attention mechanism to ignore the missing tokens in the input sequence
+        we need to mask those empty tokens. After multi-head attention the output length is batch_size, input length, embed_dim * nheads
         '''
         state, _ = self.self_attn(query=state, key=state, value=state, key_padding_mask=encoder_padding_mask)
         '''
@@ -208,12 +211,15 @@ class MultiHeadAttention(nn.Module):
         # attn must be size [tgt_time_steps, batch_size, embed_dim]
         # attn_weights is the combined output of h parallel heads of Attention(Q,K,V) in Vaswani et al. 2017
         # attn_weights must be size [num_heads, batch_size, tgt_time_steps, key.size(0)]
+<<<<<<< HEAD
         attn = torch.zeros(size=(tgt_time_steps, batch_size, embed_dim))
         attn_weights = torch.zeros(size=(self.num_heads, batch_size, tgt_time_steps, key.size(0))) if need_weights else None
         # attn is the output of MultiHead(Q,K,V) in Vaswani et al. 2017
         # attn must be size [tgt_time_steps, batch_size, embed_dim]
         # attn_weights is the combined output of h parallel heads of Attention(Q,K,V) in Vaswani et al. 2017
         # attn_weights must be size [num_heads, batch_size, tgt_time_steps, key.size(0)]
+=======
+>>>>>>> Ameer
 
         d_k = self.head_embed_size
 
@@ -253,7 +259,11 @@ class MultiHeadAttention(nn.Module):
             # Unsqueeze and repeat padding mask to match
             dotted_attention = dotted_attention.masked_fill(
                 key_padding_mask.unsqueeze(1).unsqueeze(2),
+<<<<<<< HEAD
                 -1e9,
+=======
+                float('-inf'),
+>>>>>>> Ameer
             )
             # Reshape attention back to normal
             dotted_attention = dotted_attention.view(self.num_heads * query.size(1), dotted_attention.size(2), dotted_attention.size(3))
@@ -267,6 +277,10 @@ class MultiHeadAttention(nn.Module):
            attn_weights = attn_weights.view(self.num_heads, attn.shape[1], attn.shape[0], key.size(0))
         else:
            attn_weights = None
+<<<<<<< HEAD
+=======
+
+>>>>>>> Ameer
 
 
         return attn, attn_weights
