@@ -138,7 +138,7 @@ class LSTMEncoder(Seq2SeqEncoder):
 
         '''
         ___QUESTION-1-DESCRIBE-A-START___
-        Describe what happens when self.bidirectional is set to True. 
+        Describe what happens when self.bidirectional is set to True.
         What is the difference between final_hidden_states and final_cell_states?
         '''
         if self.bidirectional:
@@ -197,7 +197,7 @@ class AttentionLayer(nn.Module):
 
         '''
         ___QUESTION-1-DESCRIBE-C-START___
-        How are attention scores calculated? What role does matrix multiplication (i.e. torch.bmm()) play 
+        How are attention scores calculated? What role does matrix multiplication (i.e. torch.bmm()) play
         in aligning encoder and decoder representations?
         '''
         projected_encoder_out = self.src_projection(encoder_out).transpose(2, 1)
@@ -245,10 +245,9 @@ class LSTMDecoder(Seq2SeqDecoder):
 
         self.use_lexical_model = use_lexical_model
         if self.use_lexical_model:
-            # __QUESTION-5: Add parts of decoder architecture corresponding to the LEXICAL MODEL here
-            # TODO: --------------------------------------------------------------------- CUT
-            pass
-            # TODO: --------------------------------------------------------------------- /CUT
+            self.lexical_projection_1 = nn.Linear(embed_dim, embed_dim)
+            self.lexical_projection_2 = nn.Linear(embed_dim, len(dictionary))
+
 
     def forward(self, tgt_inputs, encoder_out, incremental_state=None):
         """ Performs the forward pass through the instantiated model. """
@@ -308,7 +307,7 @@ class LSTMDecoder(Seq2SeqDecoder):
 
             '''
             ___QUESTION-1-DESCRIBE-E-START___
-            How is attention integrated into the decoder? Why is the attention function given the previous 
+            How is attention integrated into the decoder? Why is the attention function given the previous
             target state as one of its inputs? What is the purpose of the dropout layer?
             '''
             if self.attention is None:
@@ -318,10 +317,13 @@ class LSTMDecoder(Seq2SeqDecoder):
                 attn_weights[:, j, :] = step_attn_weights
 
                 if self.use_lexical_model:
-                    # __QUESTION-5: Compute and collect LEXICAL MODEL context vectors here
-                    # TODO: --------------------------------------------------------------------- CUT
-                    pass
-                    # TODO: --------------------------------------------------------------------- /CUT
+                    #Step attention weights of dimension (Batch size, Src time steps) -> (src time steps, batch size, 1)
+                    #Src embedding of dimension (Src time steps, batch size, embedding dim)
+
+                    #Weighted average = sum(attention_at_time(t) * word_at_time(t))
+                    #so weighted average has dim (batchsize, embedding dimension)
+                    weighted_average = torch.sum(step_attn_weights.transpose(0, 1).unsqueeze(2) * src_embeddings, axis=0)
+                    lexical_contexts.append(weighted_average)
 
             input_feed = F.dropout(input_feed, p=self.dropout_out, training=self.training)
             rnn_outputs.append(input_feed)
@@ -341,10 +343,12 @@ class LSTMDecoder(Seq2SeqDecoder):
         decoder_output = self.final_projection(decoder_output)
 
         if self.use_lexical_model:
-            # __QUESTION-5: Incorporate the LEXICAL MODEL into the prediction of target tokens here
-            # TODO: --------------------------------------------------------------------- CUT
-            pass
-            # TODO: --------------------------------------------------------------------- /CUT
+            #List of tensors of dimension (batchsize, embedding) with output_length elements
+            #Stacking gives a tensor with (output_length elements, batchsize, embedding) -> (batchsize, output_length, embedding)
+            lexical_contexts = torch.stack(lexical_contexts).transpose(0, 1)
+            proj_contexts = torch.tanh(self.lexical_projection_1(lexical_contexts)) + lexical_contexts
+            proj_contexts = self.lexical_projection_2(proj_contexts)
+            decoder_output += proj_contexts
 
         return decoder_output, attn_weights
 
