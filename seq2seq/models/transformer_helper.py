@@ -30,8 +30,8 @@ class TransformerEncoderLayer(nn.Module):
 
         '''
         ___QUESTION-6-DESCRIBE-D-START___
-        What is the purpose of encoder_padding_mask? What will the output shape of `state' Tensor 
-        be after multi-head attention? HINT: formulate your  answer in terms of 
+        What is the purpose of encoder_padding_mask? What will the output shape of `state' Tensor
+        be after multi-head attention? HINT: formulate your  answer in terms of
         constituent variables like batch_size, embed_dim etc...
         '''
         state, _ = self.self_attn(query=state, key=state, value=state, key_padding_mask=encoder_padding_mask)
@@ -113,7 +113,7 @@ class TransformerDecoderLayer(nn.Module):
         residual = state.clone()
         '''
         ___QUESTION-6-DESCRIBE-E-START___
-        How does encoder attention differ from self attention? What is the difference between key_padding_mask 
+        How does encoder attention differ from self attention? What is the difference between key_padding_mask
         and attn_mask? If you understand this difference, then why don't we need to give attn_mask here?
         '''
         state, attn = self.encoder_attn(query=state,
@@ -208,14 +208,66 @@ class MultiHeadAttention(nn.Module):
         # attn must be size [tgt_time_steps, batch_size, embed_dim]
         # attn_weights is the combined output of h parallel heads of Attention(Q,K,V) in Vaswani et al. 2017
         # attn_weights must be size [num_heads, batch_size, tgt_time_steps, key.size(0)]
-        # TODO: REPLACE THESE LINES WITH YOUR IMPLEMENTATION ------------------------ CUT
         attn = torch.zeros(size=(tgt_time_steps, batch_size, embed_dim))
-        attn_weights = torch.zeros(size=(self.num_heads, batch_size, tgt_time_steps, -1)) if need_weights else None
-        # TODO: --------------------------------------------------------------------- CUT
+        attn_weights = torch.zeros(size=(self.num_heads, batch_size, tgt_time_steps, key.size(0))) if need_weights else None
+        # attn is the output of MultiHead(Q,K,V) in Vaswani et al. 2017
+        # attn must be size [tgt_time_steps, batch_size, embed_dim]
+        # attn_weights is the combined output of h parallel heads of Attention(Q,K,V) in Vaswani et al. 2017
+        # attn_weights must be size [num_heads, batch_size, tgt_time_steps, key.size(0)]
 
-        '''
-        ___QUESTION-7-MULTIHEAD-ATTENTION-END
-        '''
+        d_k = self.head_embed_size
+
+        # input shape (target length, batch size, embed dim) -> output (target length, batch size, head_embed dim * num_heads)
+
+        # Get projections of shape (Target length, batch size * num heads, head embed dim)
+        Q =   self.q_proj(query).view(query.size(0), query.size(1) * self.num_heads, d_k)
+        K =   self.k_proj(key).view(key.size(0), key.size(1) * self.num_heads, d_k)
+        V =   self.v_proj(value).view(value.size(0), value.size(1) * self.num_heads, d_k)
+
+        # Transpose to get (batch * num heads, target length, head embed dim)
+        Q = Q.transpose(0, 1)
+        K = K.transpose(0, 1)
+        V = V.transpose(0, 1)
+
+        # Compute scaled dotted attention
+        dotted_attention = torch.matmul(Q, K.transpose(1, 2)) / math.sqrt(d_k)
+
+
+        # dotted attention shape (batch * num heads, target_length, target_length)
+
+        # Masking code mostly adapted from pytorch github repo
+        if attn_mask is not None:
+            # Apply boolean mask if torch.bool
+            if attn_mask.dtype == torch.bool:
+                dotted_attention.masked_fill_(attn_mask.unsqueeze(0), float('-inf'))
+            else:
+                dotted_attention = dotted_attention + attn_mask
+
+
+        if key_padding_mask is not None:
+            # Reshape attention weights to [num_heads, batch_size, tgt_length, tgt_length]
+            dotted_attention = dotted_attention.reshape(query.size(1),
+                self.num_heads,
+                dotted_attention.size(1),
+                dotted_attention.size(2))
+            # Unsqueeze and repeat padding mask to match
+            dotted_attention = dotted_attention.masked_fill(
+                key_padding_mask.unsqueeze(1).unsqueeze(2),
+                -1e9,
+            )
+            # Reshape attention back to normal
+            dotted_attention = dotted_attention.view(self.num_heads * query.size(1), dotted_attention.size(2), dotted_attention.size(3))
+
+        attn_weights = F.softmax(dotted_attention, dim=1)
+        attn = torch.matmul(attn_weights, V).view(query.size(0), query.size(1), self.embed_dim)
+
+        attn = self.out_proj(attn)
+
+        if need_weights:
+           attn_weights = attn_weights.view(self.num_heads, attn.shape[1], attn.shape[0], key.size(0))
+        else:
+           attn_weights = None
+
 
         return attn, attn_weights
 
