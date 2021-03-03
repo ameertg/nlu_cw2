@@ -211,15 +211,6 @@ class MultiHeadAttention(nn.Module):
         # attn must be size [tgt_time_steps, batch_size, embed_dim]
         # attn_weights is the combined output of h parallel heads of Attention(Q,K,V) in Vaswani et al. 2017
         # attn_weights must be size [num_heads, batch_size, tgt_time_steps, key.size(0)]
-<<<<<<< HEAD
-        attn = torch.zeros(size=(tgt_time_steps, batch_size, embed_dim))
-        attn_weights = torch.zeros(size=(self.num_heads, batch_size, tgt_time_steps, key.size(0))) if need_weights else None
-        # attn is the output of MultiHead(Q,K,V) in Vaswani et al. 2017
-        # attn must be size [tgt_time_steps, batch_size, embed_dim]
-        # attn_weights is the combined output of h parallel heads of Attention(Q,K,V) in Vaswani et al. 2017
-        # attn_weights must be size [num_heads, batch_size, tgt_time_steps, key.size(0)]
-=======
->>>>>>> Ameer
 
         d_k = self.head_embed_size
 
@@ -272,10 +263,6 @@ class MultiHeadAttention(nn.Module):
            attn_weights = attn_weights.view(self.num_heads, attn.shape[1], attn.shape[0], key.size(0))
         else:
            attn_weights = None
-<<<<<<< HEAD
-=======
-
->>>>>>> Ameer
 
 
         return attn, attn_weights
